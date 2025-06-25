@@ -315,3 +315,50 @@ sudo -u ready-to-study /opt/ready-to-study/venv/bin/pip list > pip-packages.txt
 ### ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。詳細は`LICENSE`ファイルを参照してください。
+
+### サービスデバッグ
+
+#### 詳細なサービス診断
+```bash
+# サービス起動問題の詳細診断
+sudo bash service-debug.sh
+
+# 以下の項目を詳細確認:
+# - サービス状態と最新ログ
+# - ファイル・ディレクトリの存在確認
+# - 権限とユーザー/グループ設定
+# - Python/仮想環境の詳細情報
+# - ポート使用状況
+# - アプリケーション手動起動テスト
+# - 修復提案
+```
+
+## 📋 運用ガイド
+
+詳細な運用手順については、`OPERATION_GUIDE.md` をご覧ください：
+
+### 主要な運用タスク
+- **日常運用**: サービス管理、ログ確認
+- **監視とメンテナンス**: リソース監視、定期メンテナンス
+- **セキュリティ**: SSL設定、ファイアウォール設定
+- **緊急時対応**: サービス復旧、ロールバック手順
+
+### クイックリファレンス
+```bash
+# 📖 詳細な運用ガイドを表示
+cat OPERATION_GUIDE.md
+
+# 🔧 基本的なサービス管理
+sudo systemctl status ready-to-study    # 状態確認
+sudo systemctl restart ready-to-study   # 再起動
+sudo journalctl -u ready-to-study -f    # ログ監視
+
+# 🚨 問題発生時の診断
+sudo ./health-check.sh                  # 基本診断
+sudo ./service-debug.sh                 # 詳細サービス診断
+sudo ./server-diagnosis.sh              # 総合システム診断
+
+# ⚡ 緊急修復
+sudo ./quick-fix.sh                     # 対話式修復メニュー
+sudo ./fix-python-env-v2.sh             # Python環境修復
+```

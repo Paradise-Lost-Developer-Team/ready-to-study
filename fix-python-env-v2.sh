@@ -57,15 +57,15 @@ check_python_version() {
 # Python3の確認（pyenv環境を回避）
 log_info "Python3の確認中..."
 
-# pyenv環境の検出と警告
-if [[ -n "$PYENV_ROOT" ]] || [[ -d "$HOME/.pyenv" ]]; then
+# pyenv環境の検出と警告（未定義変数に対応）
+if [[ -n "${PYENV_ROOT:-}" ]] || [[ -d "${HOME}/.pyenv" ]]; then
     log_warn "⚠️  pyenv環境が検出されました"
     log_info "システムレベルのPythonを使用することを推奨します"
     
     # pyenvを一時的に無効化
     export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-    unset PYENV_ROOT
-    unset PYENV_VERSION
+    unset PYENV_ROOT 2>/dev/null || true
+    unset PYENV_VERSION 2>/dev/null || true
 fi
 
 # システムPythonの確認とPython 3.8の優先インストール
