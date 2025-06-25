@@ -30,6 +30,8 @@
 
 ## セットアップ
 
+### 💻 ローカル開発環境
+
 ```bash
 # 依存関係のインストール
 pip install -r requirements.txt
@@ -39,4 +41,45 @@ python scripts/init_database.py
 
 # アプリケーションの起動
 streamlit run app.py
+```
+
+### 🐧 openSUSE Leap サーバー自動起動設定
+
+```bash
+# 1. 実行権限を設定
+chmod +x install-autostart-service.sh service-manager.sh health-check.sh
+
+# 2. サービスのインストールと自動起動設定
+sudo ./install-autostart-service.sh
+
+# 3. システム再起動後の動作確認
+sudo reboot
+# 再起動後
+./health-check.sh
+
+# 4. サービス管理
+./service-manager.sh status    # 状態確認
+./service-manager.sh logs      # ログ確認
+./service-manager.sh restart   # 再起動
+```
+
+### 🌐 アクセス方法
+- **ローカル**: http://localhost:8501
+- **ネットワーク**: http://[サーバーIP]:8501
+
+### 🛠️ サービス管理コマンド
+
+```bash
+# サービス制御
+sudo systemctl start ready-to-study     # 開始
+sudo systemctl stop ready-to-study      # 停止
+sudo systemctl restart ready-to-study   # 再起動
+sudo systemctl status ready-to-study    # 状態確認
+
+# ログ確認
+sudo journalctl -u ready-to-study -f    # リアルタイムログ
+
+# 便利なスクリプト
+./service-manager.sh help               # ヘルプ表示
+./health-check.sh                       # システム状態確認
 ```
