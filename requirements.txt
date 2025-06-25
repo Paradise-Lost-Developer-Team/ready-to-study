@@ -1,12 +1,12 @@
 # Web Framework
-streamlit==1.10.0
+streamlit==1.28.0
 streamlit-authenticator==0.2.3
 
 # Data Management
 pandas==2.1.0
 numpy==1.24.0
 sqlalchemy==2.0.20
-sqlite3
+# sqlite3 は Python標準ライブラリのため不要
 
 # Data Visualization
 matplotlib==3.7.0
