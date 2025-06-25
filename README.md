@@ -97,6 +97,15 @@ sudo bash fix-python-env-v2.sh
 sudo bash fix-python-env.sh
 ```
 
+#### Python 3.13互換性問題（pandas エラー）
+```bash
+# Python 3.13でのpandas互換性問題を解決
+sudo bash fix-python313-issue.sh
+
+# エラー例: "error: metadata-generation-failed" 
+# 原因: pandas 2.1.0がPython 3.13に対応していない
+```
+
 #### 仮想環境の問題
 ```bash
 # 仮想環境の確認
@@ -187,6 +196,7 @@ sudo -u ready-to-study cp /opt/ready-to-study/data/study_app.db /opt/ready-to-st
 | 問題 | 症状 | 解決方法 |
 |------|------|----------|
 | Python古い | `ModuleNotFoundError: No module named 'streamlit'` | `sudo bash fix-python-env-v2.sh` |
+| Python 3.13互換性 | `error: metadata-generation-failed` | `sudo bash fix-python313-issue.sh` |
 | 権限エラー | `Permission denied` | `sudo bash set-permissions.sh` |
 | ポート使用中 | `Address already in use` | `sudo systemctl restart ready-to-study` |
 | サービス停止 | アクセスできない | `sudo bash quick-fix.sh` |
@@ -197,6 +207,7 @@ sudo -u ready-to-study cp /opt/ready-to-study/data/study_app.db /opt/ready-to-st
 - `server-diagnosis.sh` - 総合環境診断
 - `fix-python-env-v2.sh` - Python環境修復（改良版）
 - `fix-python-env.sh` - Python環境修復（従来版）
+- `fix-python313-issue.sh` - Python 3.13互換性問題修復
 - `health-check.sh` - 基本ヘルスチェック
 - `quick-fix.sh` - 自動修復
 - `service-manager.sh` - サービス管理
@@ -217,3 +228,90 @@ sudo journalctl -u ready-to-study -p err
 # 特定日時のログ
 sudo journalctl -u ready-to-study --since "2024-01-01 09:00:00" --until "2024-01-01 18:00:00"
 ```
+
+## 📊 本番運用
+
+### SSL/HTTPS設定
+
+```bash
+# SSL証明書の設定（Let's Encrypt）
+sudo bash deployment/setup-ssl.sh
+
+# Nginx リバースプロキシ設定
+sudo bash deployment/setup-nginx.sh
+```
+
+### 監視とバックアップ
+
+```bash
+# システム監視の開始
+sudo bash deployment/monitor.sh
+
+# 定期バックアップの設定
+sudo bash deployment/backup.sh
+```
+
+### パフォーマンス最適化
+
+```bash
+# メモリ使用量の確認
+sudo systemctl show ready-to-study --property=MemoryCurrent
+
+# CPUリソースの確認
+sudo systemctl show ready-to-study --property=CPUUsageNSec
+
+# ログローテーションの設定
+sudo journalctl --vacuum-time=30d
+```
+
+## 🚀 更新・デプロイ
+
+### アプリケーション更新
+
+```bash
+# アプリケーションの更新
+git pull origin main
+
+# 依存関係の更新
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/pip install -r requirements.txt
+
+# サービスの再起動
+sudo systemctl restart ready-to-study
+```
+
+### データベース移行
+
+```bash
+# データベースマイグレーション
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/python scripts/migrate_database.py
+
+# データベースの整合性チェック
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/python scripts/check_database.py
+```
+
+## 📞 サポート
+
+### 問題報告
+
+システムに問題が発生した場合は、以下の情報を収集してください：
+
+```bash
+# システム情報の収集
+sudo bash server-diagnosis.sh > system-report.txt
+
+# 最新ログの収集
+sudo journalctl -u ready-to-study -n 100 > service-logs.txt
+
+# Python環境情報
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/pip list > pip-packages.txt
+```
+
+### コミュニティ
+
+- **GitHub Issues**: 技術的な問題や要望
+- **ドキュメント**: プロジェクトWiki
+- **更新情報**: リリースノート
+
+### ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。詳細は`LICENSE`ファイルを参照してください。

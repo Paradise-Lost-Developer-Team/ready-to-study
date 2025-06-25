@@ -51,10 +51,23 @@ check_python_version() {
     fi
 }
 
-# Python3の確認
+# Python3の確認（pyenv環境を回避）
 log_info "Python3の確認中..."
-if ! check_python_version "python3" >/dev/null; then
-    log_warn "適切なPython3が見つかりません。インストールを開始します..."
+
+# pyenv環境の検出と警告
+if [[ -n "$PYENV_ROOT" ]] || [[ -d "$HOME/.pyenv" ]]; then
+    log_warn "⚠️  pyenv環境が検出されました"
+    log_info "システムレベルのPythonを使用することを推奨します"
+    
+    # pyenvを一時的に無効化
+    export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+    unset PYENV_ROOT
+    unset PYENV_VERSION
+fi
+
+# システムPythonの確認
+if ! command -v python3 &>/dev/null || ! check_python_version "python3" >/dev/null; then
+    log_warn "適切なシステムPython3が見つかりません。インストールを開始します..."
     
     # パッケージ更新
     zypper refresh
@@ -66,8 +79,8 @@ if ! check_python_version "python3" >/dev/null; then
     if ! check_python_version "python3" >/dev/null; then
         log_info "より新しいPythonバージョンを探しています..."
         
-        # 利用可能なPythonバージョンを確認
-        for py_ver in python39 python310 python311 python312 python38; do
+# 利用可能なPythonバージョンを確認（Python 3.8-3.11を推奨）
+        for py_ver in python311 python310 python39 python38; do
             log_info "Python パッケージ $py_ver を確認中..."
             if zypper se "$py_ver" | grep -q "^i\|^v"; then
                 log_info "$py_ver をインストール中..."
@@ -154,14 +167,47 @@ install_package() {
 install_package "wheel" "Wheel（ビルドツール）"
 install_package "setuptools" "Setuptools（パッケージツール）"
 
-# 数値計算ライブラリ
-install_package "numpy" "NumPy（数値計算）"
-install_package "pandas" "Pandas（データ処理）"
+# Python バージョンの確認と適切なパッケージバージョンの選択
+PYTHON_VERSION_NUM=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+log_info "使用するPythonバージョン: $PYTHON_VERSION_NUM"
 
-# 可視化ライブラリ
-install_package "matplotlib" "Matplotlib（グラフ描画）"
-install_package "plotly" "Plotly（インタラクティブグラフ）"
-install_package "altair" "Altair（統計的可視化）"
+# Python 3.13の場合は、より新しいバージョンが必要
+if [[ "$PYTHON_VERSION_NUM" == "3.13" ]]; then
+    log_warn "Python 3.13検出 - 最新の互換バージョンを使用します"
+    
+    # 数値計算ライブラリ（Python 3.13対応バージョン）
+    install_package "numpy>=1.24.0" "NumPy（数値計算・3.13対応）"
+    install_package "pandas>=2.1.4" "Pandas（データ処理・3.13対応）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib>=3.8.0" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.17.0" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=5.1.0" "Altair（統計的可視化）"
+    
+elif [[ "$PYTHON_VERSION_NUM" == "3.12" ]]; then
+    log_info "Python 3.12用の安定バージョンを使用します"
+    
+    # 数値計算ライブラリ（Python 3.12対応バージョン）
+    install_package "numpy>=1.24.0,<2.0" "NumPy（数値計算・3.12対応）"
+    install_package "pandas>=2.1.0,<2.2" "Pandas（データ処理・3.12対応）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib>=3.7.0,<3.9" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.15.0,<6.0" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=5.0.0,<6.0" "Altair（統計的可視化）"
+    
+else
+    log_info "Python 3.8-3.11用の安定バージョンを使用します"
+    
+    # 数値計算ライブラリ（安定バージョン）
+    install_package "numpy==1.24.0" "NumPy（数値計算）"
+    install_package "pandas==2.1.0" "Pandas（データ処理）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib==3.7.0" "Matplotlib（グラフ描画）"
+    install_package "plotly==5.15.0" "Plotly（インタラクティブグラフ）"
+    install_package "altair==5.0.1" "Altair（統計的可視化）"
+fi
 
 # Streamlit
 log_info "🎯 Streamlit 1.28.0 をインストール中..."

@@ -87,11 +87,12 @@ if [[ ! -f "$APP_DIR/venv/bin/streamlit" ]]; then
     echo "修復方法を選択してください:"
     echo "1) Python環境を完全に再構築する（改良版・推奨）"
     echo "2) Python環境を完全に再構築する（従来版）"
-    echo "3) Streamlitのみ再インストールする"
-    echo "4) 総合環境診断を実行する"
-    echo "5) 手動で確認する"
+    echo "3) Python 3.13互換性問題を修復する"
+    echo "4) Streamlitのみ再インストールする"
+    echo "5) 総合環境診断を実行する"
+    echo "6) 手動で確認する"
     echo ""
-    read -p "選択してください (1-5): " choice
+    read -p "選択してください (1-6): " choice
     
     case $choice in
         1)
@@ -113,12 +114,21 @@ if [[ ! -f "$APP_DIR/venv/bin/streamlit" ]]; then
             fi
             ;;
         3)
+            log_info "Python 3.13互換性問題を修復します..."
+            if [[ -f "./fix-python313-issue.sh" ]]; then
+                chmod +x ./fix-python313-issue.sh
+                ./fix-python313-issue.sh
+            else
+                log_error "fix-python313-issue.sh が見つかりません"
+            fi
+            ;;
+        4)
             log_info "Streamlitを再インストールします..."
             systemctl stop ready-to-study.service || true
             sudo -u ready-to-study $APP_DIR/venv/bin/pip install --force-reinstall streamlit==1.28.0
             systemctl start ready-to-study.service
             ;;
-        4)
+        5)
             log_info "総合環境診断を実行します..."
             if [[ -f "./server-diagnosis.sh" ]]; then
                 chmod +x ./server-diagnosis.sh
@@ -127,13 +137,14 @@ if [[ ! -f "$APP_DIR/venv/bin/streamlit" ]]; then
                 log_error "server-diagnosis.sh が見つかりません"
             fi
             ;;
-        5)
+        6)
             log_info "手動確認のためのコマンド:"
             echo "• Python確認: sudo -u ready-to-study $APP_DIR/venv/bin/python --version"
             echo "• pip一覧: sudo -u ready-to-study $APP_DIR/venv/bin/pip list"
             echo "• Streamlitテスト: sudo -u ready-to-study $APP_DIR/venv/bin/streamlit version"
             echo "• 総合診断: sudo bash server-diagnosis.sh"
             echo "• 改良版Python修復: sudo bash fix-python-env-v2.sh"
+            echo "• Python 3.13修復: sudo bash fix-python313-issue.sh"
             ;;
         *)
             log_warn "無効な選択です"
