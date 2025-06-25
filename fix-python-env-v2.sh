@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # fix-python-env-v2.sh - Python環境修復スクリプト（改良版）
-# openSUSE Leap での Python 3.8+ 環境を確実に構築
+# openSUSE Leap での Python 3.8 環境を優先的に構築（最も安定）
 
 set -euo pipefail
 
@@ -22,8 +22,8 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-echo "🔧 Ready to Study - Python環境修復スクリプト v2"
-echo "================================================"
+echo "🔧 Ready to Study - Python環境修復スクリプト v2 (Python 3.8推奨)"
+echo "================================================================"
 
 # サービス停止
 log_step "サービスを停止しています..."
@@ -41,13 +41,16 @@ check_python_version() {
         
         echo "$version"
         
-        if [[ $major -eq 3 && $minor -ge 8 ]]; then
-            return 0  # OK
+        # Python 3.8を推奨とする（最も安定）
+        if [[ $major -eq 3 && $minor -eq 8 ]]; then
+            return 0  # 最適
+        elif [[ $major -eq 3 && $minor -ge 8 && $minor -le 11 ]]; then
+            return 1  # 利用可能だが3.8が推奨
         else
-            return 1  # 古い
+            return 2  # 古すぎるまたは新しすぎる
         fi
     else
-        return 2  # 存在しない
+        return 3  # 存在しない
     fi
 }
 
@@ -65,30 +68,51 @@ if [[ -n "$PYENV_ROOT" ]] || [[ -d "$HOME/.pyenv" ]]; then
     unset PYENV_VERSION
 fi
 
-# システムPythonの確認
-if ! command -v python3 &>/dev/null || ! check_python_version "python3" >/dev/null; then
-    log_warn "適切なシステムPython3が見つかりません。インストールを開始します..."
+# システムPythonの確認とPython 3.8の優先インストール
+PYTHON_VERSION=$(check_python_version "python3")
+PYTHON_STATUS=$?
+
+if [[ $PYTHON_STATUS -eq 0 ]]; then
+    log_info "✅ Python $PYTHON_VERSION (3.8) - 最適なバージョンです"
+elif [[ $PYTHON_STATUS -eq 1 ]]; then
+    log_warn "Python $PYTHON_VERSION は利用可能ですが、Python 3.8を推奨します"
+    log_info "Python 3.8へのダウングレード/アップグレードを実行します"
+    NEEDS_PYTHON38=true
+else
+    log_warn "適切なPython3が見つかりません。Python 3.8をインストールします"
+    NEEDS_PYTHON38=true
+fi
+
+if [[ "${NEEDS_PYTHON38:-false}" == "true" ]]; then
+    log_step "Python 3.8をインストール中..."
     
     # パッケージ更新
     zypper refresh
     
-    # まずは標準のpython3を試行
-    zypper install -y python3 python3-pip python3-venv python3-devel
-    
-    # バージョン再確認
-    if ! check_python_version "python3" >/dev/null; then
-        log_info "より新しいPythonバージョンを探しています..."
+    # Python 3.8を最優先でインストール
+    log_info "Python 3.8パッケージをインストール中..."
+    if zypper install -y python38 python38-pip python38-venv python38-devel; then
+        log_info "✅ Python 3.8のパッケージインストール完了"
         
-# 利用可能なPythonバージョンを確認（Python 3.8-3.11を推奨）
-        for py_ver in python311 python310 python39 python38; do
+        # alternativesでPython 3.8を最高優先度に設定
+        update-alternatives --install /usr/bin/python3 python3 /usr/bin/python38 300
+        update-alternatives --install /usr/bin/pip3 pip3 /usr/bin/pip38 300
+        
+        log_info "✅ Python 3.8をデフォルトに設定しました"
+        
+    else
+        log_warn "Python 3.8パッケージのインストールに失敗。他のバージョンを試行..."
+        
+        # フォールバック: 他のPythonバージョンを試行（3.8が最優先）
+        for py_ver in python39 python310 python311; do
             log_info "Python パッケージ $py_ver を確認中..."
             if zypper se "$py_ver" | grep -q "^i\|^v"; then
                 log_info "$py_ver をインストール中..."
                 if zypper install -y "$py_ver" "${py_ver}-pip" "${py_ver}-venv" "${py_ver}-devel" 2>/dev/null; then
-                    # シンボリックリンクの更新
+                    # シンボリックリンクの更新（3.8より低い優先度）
                     if [[ -f "/usr/bin/${py_ver}" ]]; then
-                        update-alternatives --install /usr/bin/python3 python3 "/usr/bin/${py_ver}" 100
-                        log_info "✅ $py_ver を python3 として設定しました"
+                        update-alternatives --install /usr/bin/python3 python3 "/usr/bin/${py_ver}" 200
+                        log_info "✅ $py_ver を python3 として設定しました（フォールバック）"
                         break
                     fi
                 fi
@@ -97,31 +121,32 @@ if ! command -v python3 &>/dev/null || ! check_python_version "python3" >/dev/nu
     fi
     
     # 最終確認
-    PYTHON_VERSION=$(check_python_version "python3")
-    if [[ $? -eq 0 ]]; then
-        log_info "✅ Python $PYTHON_VERSION - 要件を満たしています"
+    FINAL_VERSION=$(check_python_version "python3")
+    FINAL_STATUS=$?
+    
+    if [[ $FINAL_STATUS -eq 0 ]]; then
+        log_info "✅ Python $FINAL_VERSION (3.8) - 最適なバージョンが設定されました"
+    elif [[ $FINAL_STATUS -eq 1 ]]; then
+        log_info "✅ Python $FINAL_VERSION - 利用可能なバージョンが設定されました"
     else
         log_error "❌ Python 3.8以上のインストールに失敗しました"
         log_info "💡 手動解決方法:"
         cat << 'EOL'
-1. 外部リポジトリを追加してPython 3.9をインストール:
+1. 外部リポジトリを追加してPython 3.8をインストール:
    zypper ar https://download.opensuse.org/repositories/devel:/languages:/python/openSUSE_Leap_15.4/ python-repo
    zypper refresh
-   zypper install python39 python39-pip python39-venv
+   zypper install python38 python38-pip python38-venv
 
-2. または、ソースからビルド:
+2. または、ソースからPython 3.8をビルド:
    zypper install -y gcc make zlib-devel openssl-devel readline-devel sqlite3-devel libffi-devel
-   wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz
-   tar xzf Python-3.9.18.tgz && cd Python-3.9.18
+   wget https://www.python.org/ftp/python/3.8.18/Python-3.8.18.tgz
+   tar xzf Python-3.8.18.tgz && cd Python-3.8.18
    ./configure --enable-optimizations --prefix=/usr/local
    make -j$(nproc) && make altinstall
-   ln -sf /usr/local/bin/python3.9 /usr/bin/python3
+   ln -sf /usr/local/bin/python3.8 /usr/bin/python3
 EOL
         exit 1
     fi
-else
-    PYTHON_VERSION=$(check_python_version "python3")
-    log_info "✅ Python $PYTHON_VERSION - 要件を満たしています"
 fi
 
 # 2. 必要パッケージのインストール
@@ -167,25 +192,61 @@ install_package() {
 install_package "wheel" "Wheel（ビルドツール）"
 install_package "setuptools" "Setuptools（パッケージツール）"
 
-# Python バージョンの確認と適切なパッケージバージョンの選択
+# Python バージョンの確認とPython 3.8専用パッケージの選択
 PYTHON_VERSION_NUM=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 log_info "使用するPythonバージョン: $PYTHON_VERSION_NUM"
 
-# Python 3.13の場合は、より新しいバージョンが必要
-if [[ "$PYTHON_VERSION_NUM" == "3.13" ]]; then
-    log_warn "Python 3.13検出 - 最新の互換バージョンを使用します"
+# Python 3.8専用の最適化されたパッケージバージョンを使用
+if [[ "$PYTHON_VERSION_NUM" == "3.8" ]]; then
+    log_info "✅ Python 3.8検出 - 最適化されたパッケージバージョンを使用します"
     
-    # 数値計算ライブラリ（Python 3.13対応バージョン）
-    install_package "numpy>=1.24.0" "NumPy（数値計算・3.13対応）"
-    install_package "pandas>=2.1.4" "Pandas（データ処理・3.13対応）"
+    # 数値計算ライブラリ（Python 3.8用安定バージョン）
+    install_package "numpy>=1.20.0,<1.25" "NumPy（数値計算・3.8最適化）"
+    install_package "pandas>=1.5.0,<2.2" "Pandas（データ処理・3.8最適化）"
     
     # 可視化ライブラリ
-    install_package "matplotlib>=3.8.0" "Matplotlib（グラフ描画）"
-    install_package "plotly>=5.17.0" "Plotly（インタラクティブグラフ）"
-    install_package "altair>=5.1.0" "Altair（統計的可視化）"
+    install_package "matplotlib>=3.6.0,<3.8" "Matplotlib（グラフ描画・3.8対応）"
+    install_package "plotly>=5.10.0,<5.16" "Plotly（インタラクティブグラフ・3.8対応）"
+    install_package "altair>=4.2.0,<5.1" "Altair（統計的可視化・3.8対応）"
+    
+elif [[ "$PYTHON_VERSION_NUM" == "3.9" ]]; then
+    log_info "Python 3.9用の安定バージョンを使用します（3.8推奨）"
+    
+    # 数値計算ライブラリ（Python 3.9対応バージョン）
+    install_package "numpy>=1.21.0,<1.25" "NumPy（数値計算・3.9対応）"
+    install_package "pandas>=1.5.0,<2.2" "Pandas（データ処理・3.9対応）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib>=3.6.0,<3.8" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.12.0,<5.16" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=4.2.0,<5.1" "Altair（統計的可視化）"
+    
+elif [[ "$PYTHON_VERSION_NUM" == "3.10" ]]; then
+    log_info "Python 3.10用の安定バージョンを使用します（3.8推奨）"
+    
+    # 数値計算ライブラリ（Python 3.10対応バージョン）
+    install_package "numpy>=1.22.0,<1.25" "NumPy（数値計算・3.10対応）"
+    install_package "pandas>=1.5.0,<2.2" "Pandas（データ処理・3.10対応）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib>=3.6.0,<3.8" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.12.0,<5.16" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=4.2.0,<5.1" "Altair（統計的可視化）"
+    
+elif [[ "$PYTHON_VERSION_NUM" == "3.11" ]]; then
+    log_info "Python 3.11用の安定バージョンを使用します（3.8推奨）"
+    
+    # 数値計算ライブラリ（Python 3.11対応バージョン）
+    install_package "numpy>=1.23.0,<1.25" "NumPy（数値計算・3.11対応）"
+    install_package "pandas>=2.0.0,<2.2" "Pandas（データ処理・3.11対応）"
+    
+    # 可視化ライブラリ
+    install_package "matplotlib>=3.7.0,<3.8" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.15.0,<5.16" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=5.0.0,<5.1" "Altair（統計的可視化）"
     
 elif [[ "$PYTHON_VERSION_NUM" == "3.12" ]]; then
-    log_info "Python 3.12用の安定バージョンを使用します"
+    log_warn "Python 3.12検出 - 一部互換性問題の可能性があります（3.8推奨）"
     
     # 数値計算ライブラリ（Python 3.12対応バージョン）
     install_package "numpy>=1.24.0,<2.0" "NumPy（数値計算・3.12対応）"
@@ -196,17 +257,22 @@ elif [[ "$PYTHON_VERSION_NUM" == "3.12" ]]; then
     install_package "plotly>=5.15.0,<6.0" "Plotly（インタラクティブグラフ）"
     install_package "altair>=5.0.0,<6.0" "Altair（統計的可視化）"
     
-else
-    log_info "Python 3.8-3.11用の安定バージョンを使用します"
+elif [[ "$PYTHON_VERSION_NUM" == "3.13" ]]; then
+    log_warn "Python 3.13検出 - 互換性問題のリスクが高いです（3.8への変更を強く推奨）"
     
-    # 数値計算ライブラリ（安定バージョン）
-    install_package "numpy==1.24.0" "NumPy（数値計算）"
-    install_package "pandas==2.1.0" "Pandas（データ処理）"
+    # 数値計算ライブラリ（Python 3.13対応バージョン）
+    install_package "numpy>=1.24.0" "NumPy（数値計算・3.13対応）"
+    install_package "pandas>=2.1.4" "Pandas（データ処理・3.13対応）"
     
     # 可視化ライブラリ
-    install_package "matplotlib==3.7.0" "Matplotlib（グラフ描画）"
-    install_package "plotly==5.15.0" "Plotly（インタラクティブグラフ）"
-    install_package "altair==5.0.1" "Altair（統計的可視化）"
+    install_package "matplotlib>=3.8.0" "Matplotlib（グラフ描画）"
+    install_package "plotly>=5.17.0" "Plotly（インタラクティブグラフ）"
+    install_package "altair>=5.1.0" "Altair（統計的可視化）"
+    
+else
+    log_error "サポートされていないPythonバージョン: $PYTHON_VERSION_NUM"
+    log_info "Python 3.8への変更を強く推奨します"
+    exit 1
 fi
 
 # Streamlit
