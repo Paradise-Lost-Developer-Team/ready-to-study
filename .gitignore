@@ -6,6 +6,16 @@ __pycache__/
 # C extensions
 *.so
 
+# アプリケーション固有
+data/
+*.db
+.env.local
+.streamlit/
+
+# ログファイル
+logs/
+*.log
+
 # Distribution / packaging
 .Python
 build/
