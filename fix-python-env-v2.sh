@@ -35,21 +35,28 @@ log_step "1/7: Python環境を確認・アップグレード"
 check_python_version() {
     local python_cmd="$1"
     if command -v "$python_cmd" &>/dev/null; then
-        local version=$($python_cmd --version 2>&1 | awk '{print $2}')
-        local major=$(echo "$version" | cut -d. -f1)
-        local minor=$(echo "$version" | cut -d. -f2)
-        
-        echo "$version"
-        
-        # Python 3.8を推奨とする（最も安定）
-        if [[ $major -eq 3 && $minor -eq 8 ]]; then
-            return 0  # 最適
-        elif [[ $major -eq 3 && $minor -ge 8 && $minor -le 11 ]]; then
-            return 1  # 利用可能だが3.8が推奨
+        local version
+        if version=$($python_cmd --version 2>&1); then
+            version=$(echo "$version" | awk '{print $2}')
+            local major=$(echo "$version" | cut -d. -f1)
+            local minor=$(echo "$version" | cut -d. -f2)
+            
+            echo "$version"
+            
+            # Python 3.8を推奨とする（最も安定）
+            if [[ $major -eq 3 && $minor -eq 8 ]]; then
+                return 0  # 最適
+            elif [[ $major -eq 3 && $minor -ge 8 && $minor -le 11 ]]; then
+                return 1  # 利用可能だが3.8が推奨
+            else
+                return 2  # 古すぎるまたは新しすぎる
+            fi
         else
-            return 2  # 古すぎるまたは新しすぎる
+            echo "ERROR_VERSION"
+            return 3  # バージョン取得エラー
         fi
     else
+        echo "NOT_FOUND"
         return 3  # 存在しない
     fi
 }
@@ -57,8 +64,24 @@ check_python_version() {
 # Python3の確認（pyenv環境を回避）
 log_info "Python3の確認中..."
 
+# デバッグ: 現在の環境変数を確認
+log_info "デバッグ: HOME=$HOME"
+log_info "デバッグ: PATH=$PATH"
+
 # pyenv環境の検出と警告（未定義変数に対応）
-if [[ -n "${PYENV_ROOT:-}" ]] || [[ -d "${HOME}/.pyenv" ]]; then
+log_info "pyenv環境をチェック中..."
+if [[ -n "${PYENV_ROOT:-}" ]]; then
+    log_warn "⚠️  PYENV_ROOT環境変数が設定されています: $PYENV_ROOT"
+    PYENV_DETECTED=true
+elif [[ -d "${HOME:-/root}/.pyenv" ]]; then
+    log_warn "⚠️  pyenvディレクトリが検出されました: ${HOME:-/root}/.pyenv"
+    PYENV_DETECTED=true
+else
+    log_info "✅ pyenv環境は検出されませんでした"
+    PYENV_DETECTED=false
+fi
+
+if [[ "${PYENV_DETECTED:-false}" == "true" ]]; then
     log_warn "⚠️  pyenv環境が検出されました"
     log_info "システムレベルのPythonを使用することを推奨します"
     
@@ -66,11 +89,21 @@ if [[ -n "${PYENV_ROOT:-}" ]] || [[ -d "${HOME}/.pyenv" ]]; then
     export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
     unset PYENV_ROOT 2>/dev/null || true
     unset PYENV_VERSION 2>/dev/null || true
+    log_info "✅ pyenv環境を無効化しました"
 fi
 
 # システムPythonの確認とPython 3.8の優先インストール
-PYTHON_VERSION=$(check_python_version "python3")
-PYTHON_STATUS=$?
+log_info "Python3コマンドの存在確認..."
+if ! command -v python3 &>/dev/null; then
+    log_warn "python3コマンドが見つかりません"
+    PYTHON_VERSION="NOTFOUND"
+    PYTHON_STATUS=3
+else
+    log_info "python3コマンドが見つかりました: $(which python3)"
+    PYTHON_VERSION=$(check_python_version "python3")
+    PYTHON_STATUS=$?
+    log_info "Python バージョン: $PYTHON_VERSION (ステータス: $PYTHON_STATUS)"
+fi
 
 if [[ $PYTHON_STATUS -eq 0 ]]; then
     log_info "✅ Python $PYTHON_VERSION (3.8) - 最適なバージョンです"
@@ -78,8 +111,11 @@ elif [[ $PYTHON_STATUS -eq 1 ]]; then
     log_warn "Python $PYTHON_VERSION は利用可能ですが、Python 3.8を推奨します"
     log_info "Python 3.8へのダウングレード/アップグレードを実行します"
     NEEDS_PYTHON38=true
+elif [[ $PYTHON_STATUS -eq 2 ]]; then
+    log_warn "Python $PYTHON_VERSION は古いまたは新しすぎます。Python 3.8をインストールします"
+    NEEDS_PYTHON38=true
 else
-    log_warn "適切なPython3が見つかりません。Python 3.8をインストールします"
+    log_warn "適切なPython3が見つかりません（バージョン: $PYTHON_VERSION）。Python 3.8をインストールします"
     NEEDS_PYTHON38=true
 fi
 
