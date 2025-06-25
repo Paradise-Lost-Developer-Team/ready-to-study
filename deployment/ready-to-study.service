@@ -1,0 +1,30 @@
+[Unit]
+Description=Ready to Study - 高校生学習支援アプリ
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=ready-to-study
+Group=ready-to-study
+WorkingDirectory=/opt/ready-to-study
+Environment=PATH=/opt/ready-to-study/venv/bin
+ExecStart=/opt/ready-to-study/venv/bin/streamlit run app.py --server.address 0.0.0.0 --server.port 8501 --server.headless true
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+
+# セキュリティ設定
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/ready-to-study /var/log/ready-to-study /var/backups/ready-to-study
+
+# リソース制限
+LimitNOFILE=65535
+MemoryMax=2G
+CPUQuota=200%
+
+[Install]
+WantedBy=multi-user.target

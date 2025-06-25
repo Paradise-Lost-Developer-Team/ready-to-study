@@ -24,7 +24,12 @@ st.set_page_config(
     page_title="Ready to Study",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/yourusername/ready-to-study',
+        'Report a bug': 'https://github.com/yourusername/ready-to-study/issues',
+        'About': "# Ready to Study\n高校生向け学習支援アプリ v1.0.0"
+    }
 )
 
 # カスタムCSS

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # PostgreSQLデータベース
+  postgres:
+    image: postgres:15
+    container_name: ready-to-study-db
+    environment:
+      POSTGRES_DB: ready_to_study_db
+      POSTGRES_USER: ready_to_study
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deployment/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ready_to_study -d ready_to_study_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Ready to Study アプリケーション
+  app:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile
+    container_name: ready-to-study-app
+    environment:
+      - DATABASE_URL=postgresql://ready_to_study:password@postgres:5432/ready_to_study_db
+      - ENVIRONMENT=production
+    volumes:
+      - app_data:/app/data
+      - app_logs:/app/logs
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx (リバースプロキシ)
+  nginx:
+    image: nginx:alpine
+    container_name: ready-to-study-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deployment/nginx-docker.conf:/etc/nginx/conf.d/default.conf
+      - ./deployment/ssl:/etc/ssl/certs
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+
+networks:
+  default:
+    name: ready-to-study-network
