@@ -85,15 +85,26 @@ if [[ ! -f "$APP_DIR/venv/bin/streamlit" ]]; then
     log_error "❌ Streamlitが見つかりません"
     echo ""
     echo "修復方法を選択してください:"
-    echo "1) Python環境を完全に再構築する（推奨）"
-    echo "2) Streamlitのみ再インストールする"
-    echo "3) 手動で確認する"
+    echo "1) Python環境を完全に再構築する（改良版・推奨）"
+    echo "2) Python環境を完全に再構築する（従来版）"
+    echo "3) Streamlitのみ再インストールする"
+    echo "4) 総合環境診断を実行する"
+    echo "5) 手動で確認する"
     echo ""
-    read -p "選択してください (1-3): " choice
+    read -p "選択してください (1-5): " choice
     
     case $choice in
         1)
-            log_info "Python環境を完全再構築します..."
+            log_info "Python環境を完全再構築します（改良版）..."
+            if [[ -f "./fix-python-env-v2.sh" ]]; then
+                chmod +x ./fix-python-env-v2.sh
+                ./fix-python-env-v2.sh
+            else
+                log_error "fix-python-env-v2.sh が見つかりません"
+            fi
+            ;;
+        2)
+            log_info "Python環境を完全再構築します（従来版）..."
             if [[ -f "./fix-python-env.sh" ]]; then
                 chmod +x ./fix-python-env.sh
                 ./fix-python-env.sh
@@ -101,17 +112,28 @@ if [[ ! -f "$APP_DIR/venv/bin/streamlit" ]]; then
                 log_error "fix-python-env.sh が見つかりません"
             fi
             ;;
-        2)
+        3)
             log_info "Streamlitを再インストールします..."
             systemctl stop ready-to-study.service || true
             sudo -u ready-to-study $APP_DIR/venv/bin/pip install --force-reinstall streamlit==1.28.0
             systemctl start ready-to-study.service
             ;;
-        3)
+        4)
+            log_info "総合環境診断を実行します..."
+            if [[ -f "./server-diagnosis.sh" ]]; then
+                chmod +x ./server-diagnosis.sh
+                ./server-diagnosis.sh
+            else
+                log_error "server-diagnosis.sh が見つかりません"
+            fi
+            ;;
+        5)
             log_info "手動確認のためのコマンド:"
             echo "• Python確認: sudo -u ready-to-study $APP_DIR/venv/bin/python --version"
             echo "• pip一覧: sudo -u ready-to-study $APP_DIR/venv/bin/pip list"
             echo "• Streamlitテスト: sudo -u ready-to-study $APP_DIR/venv/bin/streamlit version"
+            echo "• 総合診断: sudo bash server-diagnosis.sh"
+            echo "• 改良版Python修復: sudo bash fix-python-env-v2.sh"
             ;;
         *)
             log_warn "無効な選択です"
@@ -148,5 +170,8 @@ echo ""
 echo "📋 役立つコマンド:"
 echo "• リアルタイムログ: sudo journalctl -u ready-to-study -f"
 echo "• サービス再起動: sudo systemctl restart ready-to-study"
-echo "• Python環境修復: sudo ./fix-python-env.sh"
-echo "• ヘルスチェック: ./health-check.sh"
+echo "• 総合環境診断: sudo bash server-diagnosis.sh"
+echo "• Python修復（改良版）: sudo bash fix-python-env-v2.sh"
+echo "• Python修復（従来版）: sudo bash fix-python-env.sh"
+echo "• 基本ヘルスチェック: bash health-check.sh"
+echo "• サービス管理: bash service-manager.sh"

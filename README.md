@@ -83,3 +83,137 @@ sudo journalctl -u ready-to-study -f    # リアルタイムログ
 ./service-manager.sh help               # ヘルプ表示
 ./health-check.sh                       # システム状態確認
 ```
+
+## 🔧 トラブルシューティング
+
+### Python環境の問題
+
+#### Python 3.8未満・Streamlit動作問題
+```bash
+# 【推奨】改良版Python環境修復スクリプト
+sudo bash fix-python-env-v2.sh
+
+# 従来版の修復スクリプト
+sudo bash fix-python-env.sh
+```
+
+#### 仮想環境の問題
+```bash
+# 仮想環境の確認
+ls -la /opt/ready-to-study/venv/bin/
+
+# Streamlitの存在確認
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/pip list | grep streamlit
+
+# 手動でStreamlit再インストール
+sudo -u ready-to-study /opt/ready-to-study/venv/bin/pip install streamlit==1.28.0
+```
+
+### 環境診断とヘルスチェック
+
+#### 総合診断ツール
+```bash
+# サーバー環境の総合診断（システム、Python、サービス、ネットワーク）
+sudo bash server-diagnosis.sh
+
+# 基本ヘルスチェック
+sudo bash health-check.sh
+
+# クイック修復
+sudo bash quick-fix.sh
+```
+
+### サービス関連の問題
+
+#### サービスが起動しない
+```bash
+# 1. 環境診断で問題特定
+sudo bash server-diagnosis.sh
+
+# 2. サービス状態確認
+sudo systemctl status ready-to-study
+
+# 3. 詳細ログ確認
+sudo journalctl -u ready-to-study -n 50
+
+# 4. 一括修復実行
+sudo bash quick-fix.sh
+```
+
+#### ポート8501にアクセスできない
+```bash
+# ポート確認
+sudo netstat -tlnp | grep 8501
+# または
+sudo ss -tlnp | grep 8501
+
+# ファイアウォール確認・設定
+sudo firewall-cmd --query-port=8501/tcp
+sudo firewall-cmd --permanent --add-port=8501/tcp
+sudo firewall-cmd --reload
+```
+
+### 権限関連の問題
+
+#### ファイル・ディレクトリの権限エラー
+```bash
+# 権限の一括修復
+sudo bash set-permissions.sh
+
+# 手動権限設定
+sudo chown -R ready-to-study:ready-to-study /opt/ready-to-study
+sudo chmod +x /opt/ready-to-study/venv/bin/streamlit
+```
+
+### 定期メンテナンス
+
+#### システム更新
+```bash
+# openSUSE Leapのシステム更新
+sudo zypper update
+
+# Python環境の更新（必要に応じて）
+sudo bash fix-python-env-v2.sh
+```
+
+#### データベースバックアップ
+```bash
+# データベースのバックアップ
+sudo -u ready-to-study cp /opt/ready-to-study/data/study_app.db /opt/ready-to-study/data/study_app.db.backup.$(date +%Y%m%d)
+```
+
+### よくある問題と解決方法
+
+| 問題 | 症状 | 解決方法 |
+|------|------|----------|
+| Python古い | `ModuleNotFoundError: No module named 'streamlit'` | `sudo bash fix-python-env-v2.sh` |
+| 権限エラー | `Permission denied` | `sudo bash set-permissions.sh` |
+| ポート使用中 | `Address already in use` | `sudo systemctl restart ready-to-study` |
+| サービス停止 | アクセスできない | `sudo bash quick-fix.sh` |
+| メモリ不足 | アプリが遅い | サーバーリソース確認、再起動 |
+
+### サポートツール一覧
+
+- `server-diagnosis.sh` - 総合環境診断
+- `fix-python-env-v2.sh` - Python環境修復（改良版）
+- `fix-python-env.sh` - Python環境修復（従来版）
+- `health-check.sh` - 基本ヘルスチェック
+- `quick-fix.sh` - 自動修復
+- `service-manager.sh` - サービス管理
+- `set-permissions.sh` - 権限修復
+
+### ログの確認方法
+
+```bash
+# リアルタイムログ
+sudo journalctl -u ready-to-study -f
+
+# 最新ログ（50行）
+sudo journalctl -u ready-to-study -n 50
+
+# エラーログのみ
+sudo journalctl -u ready-to-study -p err
+
+# 特定日時のログ
+sudo journalctl -u ready-to-study --since "2024-01-01 09:00:00" --until "2024-01-01 18:00:00"
+```

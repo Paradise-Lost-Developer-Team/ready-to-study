@@ -32,12 +32,143 @@ APP_DIR="/opt/ready-to-study"
 log_step "サービスを停止しています..."
 systemctl stop ready-to-study.service || true
 
-# Python3とpipの確認
+# Python3の確認とバージョンチェック
 log_step "Python環境を確認しています..."
 if ! command -v python3 &> /dev/null; then
     log_error "Python3がインストールされていません"
     log_info "Python3をインストールしています..."
     zypper install -y python3 python3-pip python3-venv
+fi
+
+# Pythonバージョンの確認
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+
+log_info "現在のPythonバージョン: $PYTHON_VERSION"
+
+# Python 3.8以上が必要（Streamlit 1.28.0の要件）
+if [[ $PYTHON_MAJOR -lt 3 ]] || [[ $PYTHON_MAJOR -eq 3 && $PYTHON_MINOR -lt 8 ]]; then
+    log_warn "⚠️  Python $PYTHON_VERSION は古すぎます（Streamlitには3.8以上が必要）"
+    log_step "新しいPythonバージョンをインストールしています..."
+    
+    # openSUSE Leap用のPythonアップグレード
+    zypper refresh
+    
+    # 利用可能なPythonパッケージを確認
+    log_info "利用可能なPythonパッケージを確認しています..."
+    zypper search python3 | grep "^i\|^v" | head -10
+    
+    # Python 3.9以上を試行
+    for py_version in python39 python310 python311 python38; do
+        log_info "Python パッケージ $py_version を試行しています..."
+        if zypper install -y $py_version ${py_version}-pip ${py_version}-venv 2>/dev/null; then
+            log_info "✅ $py_version のインストールに成功しました"
+            
+            # シンボリックリンクの更新
+            if [[ -f "/usr/bin/${py_version}" ]]; then
+                update-alternatives --install /usr/bin/python3 python3 /usr/bin/${py_version} 1
+                log_info "python3 コマンドを $py_version に更新しました"
+                break
+            fi
+        else
+            log_warn "$py_version のインストールに失敗しました"
+        fi
+    done
+    
+    # 再度バージョン確認
+    NEW_PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+    log_info "アップグレード後のPythonバージョン: $NEW_PYTHON_VERSION"
+    
+    # まだ古い場合は手動ビルドを提案
+    NEW_PYTHON_MAJOR=$(echo $NEW_PYTHON_VERSION | cut -d. -f1)
+    NEW_PYTHON_MINOR=$(echo $NEW_PYTHON_VERSION | cut -d. -f2)
+    
+    if [[ $NEW_PYTHON_MAJOR -lt 3 ]] || [[ $NEW_PYTHON_MAJOR -eq 3 && $NEW_PYTHON_MINOR -lt 8 ]]; then
+        log_error "❌ Python 3.8以上のインストールに失敗しました"
+        log_info "💡 手動解決方法:"
+        echo "1. ソースからPython 3.9をビルド:"
+        echo "   zypper install -y gcc make zlib-devel openssl-devel readline-devel sqlite3-devel"
+        echo "   wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz"
+        echo "   tar xzf Python-3.9.18.tgz && cd Python-3.9.18"
+        echo "   ./configure --enable-optimizations --prefix=/usr/local"
+        echo "   make -j\$(nproc) && make altinstall"
+        echo "   ln -sf /usr/local/bin/python3.9 /usr/bin/python3"
+        echo ""
+        echo "2. または、openSUSE Tumbleweedリポジトリを追加:"
+        echo "   zypper ar https://download.opensuse.org/tumbleweed/repo/oss/ tumbleweed"
+        echo "   zypper install python3"
+        exit 1
+    fi
+else
+    log_info "✅ Python $PYTHON_VERSION は要件を満たしています"
+fi
+
+# Pythonバージョン確認
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+REQUIRED_VERSION="3.8"
+
+log_info "現在のPythonバージョン: $(python3 --version)"
+
+# バージョン比較関数
+version_compare() {
+    if [[ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$1" ]]; then
+        return 1  # $1 < $2
+    else
+        return 0  # $1 >= $2
+    fi
+}
+
+# Python 3.8以上が必要
+if ! version_compare "$PYTHON_VERSION" "$REQUIRED_VERSION"; then
+    log_warn "⚠️  Python $PYTHON_VERSION は古すぎます（Streamlit 1.28.0には3.8以上が必要）"
+    log_step "新しいPythonをインストールしています..."
+    
+    # openSUSE Leapでの新しいPythonインストール
+    log_info "パッケージリポジトリを更新しています..."
+    zypper refresh
+    
+    # Python 3.9以上を試行
+    if zypper se python39 | grep -q python39; then
+        log_info "Python 3.9をインストールしています..."
+        zypper install -y python39 python39-pip python39-venv python39-devel
+        
+        # python3のリンクを更新
+        if [[ -f /usr/bin/python3.9 ]]; then
+            update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 100
+            log_info "✅ Python 3.9をデフォルトに設定しました"
+        fi
+    elif zypper se python38 | grep -q python38; then
+        log_info "Python 3.8をインストールしています..."
+        zypper install -y python38 python38-pip python38-venv python38-devel
+        
+        # python3のリンクを更新
+        if [[ -f /usr/bin/python3.8 ]]; then
+            update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 100
+            log_info "✅ Python 3.8をデフォルトに設定しました"
+        fi
+    else
+        log_info "標準リポジトリから最新のPython3をインストールしています..."
+        zypper install -y python3 python3-pip python3-venv python3-devel
+        
+        # 開発ツールも追加
+        zypper install -y gcc gcc-c++ make
+    fi
+    
+    # 再度バージョン確認
+    log_info "更新後のPythonバージョン: $(python3 --version)"
+    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}' | cut -d. -f1,2)
+    
+    if ! version_compare "$PYTHON_VERSION" "$REQUIRED_VERSION"; then
+        log_error "❌ Pythonのアップグレードに失敗しました"
+        log_info "手動でPython 3.8以上をインストールしてください:"
+        log_info "1. zypper ar https://download.opensuse.org/repositories/devel:/languages:/python/openSUSE_Leap_15.3/ python"
+        log_info "2. zypper refresh"
+        log_info "3. zypper install python39 python39-pip python39-venv"
+        exit 1
+    fi
+else
+    log_info "✅ Python $PYTHON_VERSION は要件を満たしています"
 fi
 
 # 仮想環境を完全に削除して再作成
