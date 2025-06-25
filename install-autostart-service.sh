@@ -36,12 +36,15 @@ echo "• アプリケーション配置先: $APP_DIR"
 echo "• OS: $(cat /etc/os-release | grep PRETTY_NAME | cut -d'=' -f2 | tr -d '"')"
 echo ""
 
-# アプリケーション用ユーザーの作成
+# アプリケーション用ユーザーとグループの作成
 log_step "アプリケーション用ユーザーの作成"
 if id "ready-to-study" &>/dev/null; then
     log_info "ユーザー 'ready-to-study' は既に存在します"
 else
-    useradd -r -d /opt/ready-to-study -s /bin/false ready-to-study
+    # グループを先に作成
+    groupadd -r ready-to-study
+    # ユーザーを作成してグループに追加
+    useradd -r -g ready-to-study -d /opt/ready-to-study -s /bin/false ready-to-study
     log_info "ユーザー 'ready-to-study' を作成しました"
 fi
 
@@ -54,9 +57,15 @@ mkdir -p /var/backups/ready-to-study
 # アプリケーションファイルのコピー
 log_info "アプリケーションファイルをコピーしています..."
 cp -r "$SCRIPT_DIR/"* $APP_DIR/
-chown -R ready-to-study:ready-to-study $APP_DIR
-chown ready-to-study:ready-to-study /var/log/ready-to-study
-chown ready-to-study:ready-to-study /var/backups/ready-to-study
+
+# 権限設定（段階的に実行）
+log_info "ファイル権限を設定しています..."
+chown -R ready-to-study $APP_DIR
+chgrp -R ready-to-study $APP_DIR
+chown ready-to-study /var/log/ready-to-study
+chgrp ready-to-study /var/log/ready-to-study
+chown ready-to-study /var/backups/ready-to-study
+chgrp ready-to-study /var/backups/ready-to-study
 
 # Python仮想環境の作成
 log_step "Python仮想環境の作成"

@@ -84,8 +84,19 @@ echo ""
 # ネットワークとポートチェック
 echo "🌐 ネットワークとポートチェック"
 echo "----------------------------"
-check_item "ポート8501がリッスン中" "netstat -tlnp | grep :8501"
-check_item "ローカルホストでHTTPアクセス可能" "curl -s http://localhost:8501 | grep -q 'Ready to Study' || timeout 5 curl -s http://localhost:8501"
+if command -v netstat &>/dev/null; then
+    check_item "ポート8501がリッスン中" "netstat -tlnp | grep :8501"
+elif command -v ss &>/dev/null; then
+    check_item "ポート8501がリッスン中" "ss -tlnp | grep :8501"
+else
+    log_warn "⚠️  netstat/ssコマンドが見つかりません"
+fi
+
+if command -v curl &>/dev/null; then
+    check_item "ローカルホストでHTTPアクセス可能" "timeout 10 curl -s http://localhost:8501 >/dev/null"
+else
+    log_warn "⚠️  curlコマンドが見つかりません"
+fi
 echo ""
 
 # データベースチェック
